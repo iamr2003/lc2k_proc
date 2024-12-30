@@ -1,5 +1,5 @@
 module decoder(
-    input [24:0] instr,
+    input [31:0] instr, //note that bits 31-25 are unused
     output [2:0] opcode,
     output [2:0] regA,
                  regB,
