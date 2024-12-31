@@ -7,7 +7,7 @@ module proc (
   // opcodes, might end up somewhere else
   // integer may be wrong dtype
   // opcodes are the states of each pipeline
-  localparam reg[2:0] ADD = 3'b000,  //rtype
+  localparam reg [2:0] ADD = 3'b000,  //rtype
   NOR = 3'b001,  // rtype
   LW = 3'b010,  // ltype
   SW = 3'b011,  // ltype
@@ -18,6 +18,7 @@ module proc (
 
   // need to understand integer type
   reg [31:0] pc;
+  reg halted = 0;
 
   reg [31:0] branch_target;
   reg [31:0] next_instr;
@@ -74,7 +75,8 @@ module proc (
   alu arithmetic (
       .in_a(idex_RegA_val),
       .in_b(idex_RegB_val),
-      .to_add(idex_op != NOR),
+      .to_add(ifid_op != NOR),
+      // there's a scuffed thing happening in the pipeline where it's going farther forward than I want
       .out(exmem_alu_result)
   );
 
@@ -84,25 +86,32 @@ module proc (
 
   //push opcodes further, may need more sequential logic
   always @(posedge clock) begin
+    if (!halted) begin
+      $display("ifid_op = %d, ifid_regA = %d, ifid_regB = %d, ifid_destReg = %d", ifid_op,
+               ifid_regA, ifid_regB, ifid_destReg);
+      $display("idex_op = %d, idex_destReg = %d, idex_regAv = %d, idex_regBv = %d", idex_op,
+               idex_destReg, idex_RegA_val, idex_RegB_val);
+      $display("exmem_op = %d, exmem_destReg = %d, exmem_alu_result = %d", exmem_op, exmem_destReg,
+               exmem_alu_result);
+    end
+    if (ifid_op == HALT) halted = 1;
+    if (halted) ifid_op = NOOP;
     idex_op = ifid_op;
     idex_destReg = ifid_destReg;
+
 
     exmem_op = idex_op;
     exmem_destReg = idex_destReg;
     //ordering matters here, flexibility allows for lw in future
     reg_mem_write_enable = exmem_op == ADD || exmem_op == NOR;
     reg_mem_write_value = exmem_alu_result;
+    if (reg_mem_write_enable)
+      $display("reg_mem_write_value = %d, exmem_destReg = %d", reg_mem_write_value, exmem_destReg);
 
     memwb_op = exmem_op;
     //for now ignore branching
     pc = pc + 1;
+    //$display("pc = %d", pc);
   end
-
-
-
-
-
-
-
 
 endmodule
